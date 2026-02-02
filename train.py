@@ -10,14 +10,28 @@ from cnn_model import CNN
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def train(model_type="mlp"):
+def set_seed(seed=42):
+    import random
+    import numpy as np
+    import torch
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def train(model_type="mlp", seed=42):
+    set_seed(seed)
+
     X_train, X_val, y_train, y_val = generate_dataset()
 
-    # Move data to GPU / CPU
     X_train, X_val = X_train.to(device), X_val.to(device)
     y_train, y_val = y_train.to(device), y_val.to(device)
 
-    # Select model
     if model_type == "mlp":
         model = MLP().to(device)
         save_path = "mlp_model.pth"
@@ -30,8 +44,8 @@ def train(model_type="mlp"):
     criterion = nn.BCELoss()
     optimizer = optim.Adam(
         model.parameters(),
-        lr=0.05,
-        weight_decay=1e-4
+        lr=0.01,
+        weight_decay=5e-4
     )
 
     train_losses, val_losses = [], []
@@ -66,5 +80,5 @@ def train(model_type="mlp"):
 
 
 if __name__ == "__main__":
-    train("mlp")
-    train("cnn")
+    train("mlp", seed=42)
+    train("cnn", seed=42)
