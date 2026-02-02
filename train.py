@@ -1,103 +1,70 @@
 # train.py
-
-# Core PyTorch library
 import torch
-
-# Loss functions
 import torch.nn as nn
-
-# Optimizers
 import torch.optim as optim
 
-# Dataset generator
 from dataset import generate_dataset
-
-# Model definition
 from model import MLP
+from cnn_model import CNN
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def train():
-    # Generate training and validation datasets
+def train(model_type="mlp"):
     X_train, X_val, y_train, y_val = generate_dataset()
 
-    # Instantiate MLP model
-    model = MLP()
+    # Move data to GPU / CPU
+    X_train, X_val = X_train.to(device), X_val.to(device)
+    y_train, y_val = y_train.to(device), y_val.to(device)
 
-    # Binary Cross Entropy loss
-    #
-    # L = -[ y log(ŷ) + (1-y) log(1-ŷ) ]
-    #
-    # Used for binary classification with sigmoid outputs
+    # Select model
+    if model_type == "mlp":
+        model = MLP().to(device)
+        save_path = "mlp_model.pth"
+    elif model_type == "cnn":
+        model = CNN().to(device)
+        save_path = "cnn_model.pth"
+    else:
+        raise ValueError("Unknown model type")
+
     criterion = nn.BCELoss()
-
-    # Adam optimizer
-    #
-    # Combines:
-    #   - Momentum (1st moment)
-    #   - RMSProp (2nd moment)
     optimizer = optim.Adam(
-        model.parameters(),     # parameters θ to optimize
-        lr=0.01,                # learning rate α
-        weight_decay=1e-4       # L2 regularization (λ ||θ||²)
+        model.parameters(),
+        lr=0.05,
+        weight_decay=1e-4
     )
 
-    # Lists to track loss curves
     train_losses, val_losses = [], []
 
-    # Training loop
     for epoch in range(1000):
-
-        # ---- TRAIN PHASE ----
-        model.train()  # enables gradient computation
-
-        # Clear old gradients
-        # ∂L/∂θ accumulates by default in PyTorch
+        model.train()
         optimizer.zero_grad()
 
-        # Forward pass
-        # ŷ = f(x; θ)
         y_pred = model(X_train)
-
-        # Compute training loss
         loss = criterion(y_pred, y_train)
-
-        # Backpropagation
-        #
-        # Computes:
-        #   ∂L/∂θ using chain rule
         loss.backward()
-
-        # Parameter update
-        #
-        # θ ← θ - α ∇θ L
         optimizer.step()
 
-        # ---- VALIDATION PHASE ----
-        model.eval()  # disables dropout / batchnorm (if any)
-
-        # Disable gradient tracking for validation
+        model.eval()
         with torch.no_grad():
             val_pred = model(X_val)
             val_loss = criterion(val_pred, y_val)
 
-        # Store losses for visualization
         train_losses.append(loss.item())
         val_losses.append(val_loss.item())
 
-        # Print progress every 100 epochs
         if epoch % 100 == 0:
             print(
+                f"[{model_type.upper()}] "
                 f"Epoch {epoch:4d} | "
-                f"Train Loss: {loss.item():.4f} | "
-                f"Val Loss: {val_loss.item():.4f}"
+                f"Train {loss.item():.4f} | "
+                f"Val {val_loss.item():.4f}"
             )
 
-    # Save trained weights to disk
-    torch.save(model.state_dict(), "mlp_model.pth")
-
-    return train_losses, val_losses
+    torch.save(model.state_dict(), save_path)
+    return model, train_losses, val_losses
 
 
-# Entry point
 if __name__ == "__main__":
-    train()# model.py
+    train("mlp")
+    train("cnn")
